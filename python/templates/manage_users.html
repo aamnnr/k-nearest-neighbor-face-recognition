@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kelola Pengguna</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 50px; background-color: #f4f4f4; }
+        .container { background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); max-width: 1000px; margin: auto; }
+        h1 { color: #333; text-align: center; margin-bottom: 30px; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+            vertical-align: top;
+            font-size: 0.95em;
+        }
+        th {
+            background-color: #007bff;
+            color: white;
+            font-weight: bold;
+        }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+        tr:hover { background-color: #ddd; }
+        .no-data { text-align: center; color: #666; padding: 20px; }
+        .back-button {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #6c757d;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+        .back-button:hover { background-color: #5a6268; }
+        .flash-message { padding: 10px; border-radius: 5px; margin-bottom: 10px; }
+        .flash-message.success { background-color: #d4edda; color: #155724; border: 1px solid #28a745; }
+        .flash-message.error { background-color: #f8d7da; color: #721c24; border: 1px solid #dc3545; }
+        .action-buttons button {
+            padding: 5px 10px;
+            margin: 2px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            color: white;
+            font-size: 0.9em;
+        }
+        .action-buttons .edit-btn { background-color: #ffc107; color: #333; }
+        .action-buttons .edit-btn:hover { background-color: #e0a800; }
+        .action-buttons .delete-btn { background-color: #dc3545; }
+        .action-buttons .delete-btn:hover { background-color: #c82333; }
+
+        .modal {
+            display: none; /* Sembunyikan secara default */
+            position: fixed; /* Tetap di tempat */
+            z-index: 1; /* Di atas konten lain */
+            left: 0;
+            top: 0;
+            width: 100%; /* Lebar penuh */
+            height: 100%; /* Tinggi penuh */
+            overflow: auto; /* Aktifkan scroll jika konten terlalu besar */
+            background-color: rgba(0,0,0,0.4); /* Warna latar belakang gelap */
+            justify-content: center; /* Pusatkan secara horizontal */
+            align-items: center; /* Pusatkan secara vertikal */
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto; /* 15% dari atas dan dipusatkan */
+            padding: 20px;
+            border: 1px solid #888;
+            border-radius: 8px;
+            width: 80%; /* Lebar modal */
+            max-width: 400px; /* Lebar maksimum */
+            text-align: center;
+        }
+        .modal-content h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        .modal-content p {
+            margin-bottom: 20px;
+            color: #555;
+        }
+        .modal-buttons button {
+            padding: 10px 20px;
+            margin: 0 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+        .modal-buttons .confirm-btn { background-color: #dc3545; color: white; }
+        .modal-buttons .confirm-btn:hover { background-color: #c82333; }
+        .modal-buttons .cancel-btn { background-color: #6c757d; color: white; }
+        .modal-buttons .cancel-btn:hover { background-color: #5a6268; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Daftar Pengguna Sistem</h1>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul class="flashes">
+                {% for category, message in messages %}
+                    <li class="flash-message {{ category }}">{{ message }}</li>
+                {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+
+        {# Add New User button, adjusted to be outside the table for better flow #}
+        <a href="{{ url_for('register_user') }}" class="back-button" style="margin-bottom: 20px;">Tambah Pengguna Baru</a>
+
+        {% if users %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID User</th>
+                        <th>Nama</th>
+                        <th>Alamat</th>
+                        <th>No. HP</th>
+                        <th>Tanggal Lahir</th>
+                        <th>Jenis Kelamin</th>
+                        <th>Face ID</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>{{ user.user_id }}</td>
+                        <td>{{ user.nama }}</td>
+                        <td>{{ user.alamat if user.alamat else '-' }}</td>
+                        <td>{{ user.no_hp if user.no_hp else '-' }}</td>
+                        <td>{{ user.tanggal_lahir if user.tanggal_lahir else '-' }}</td>
+                        <td>{{ user.jenis_kelamin if user.jenis_kelamin else '-'}}</td>
+                        <td>{{ user.face_id if user.face_id else '-' }}</td>
+                        <td class="action-buttons">
+                            {# Tombol Edit #}
+                            <button class="edit-btn" data-user-id="{{ user.user_id }}">Edit</button>
+                            {# Tombol Delete #}
+                            <button class="delete-btn" data-user-id="{{ user.user_id }}" data-user-name="{{ user.nama }}">Hapus</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="no-data">Belum ada pengguna terdaftar.</p>
+        {% endif %}
+
+        <a href="{{ url_for('index') }}" class="back-button">Kembali ke Beranda</a>
+    </div>
+
+    {# Modal Konfirmasi Hapus #}
+    <div id="deleteConfirmationModal" class="modal">
+        <div class="modal-content">
+            <h2>Konfirmasi Penghapusan</h2>
+            <p>Anda yakin ingin menghapus pengguna <strong id="userNameToDelete"></strong>?</p>
+            <p>Tindakan ini tidak dapat dibatalkan dan akan menghapus semua data terkait.</p>
+            <div class="modal-buttons">
+                <button type="button" class="confirm-btn" id="confirmDeleteBtn">Ya, Hapus</button>
+                <button type="button" class="cancel-btn" id="cancelDeleteBtn">Batal</button>
+            </div>
+        </div>
+    </div>
+
+    <form id="deleteForm" method="POST" style="display: none;">
+        <input type="hidden" name="user_id" id="formUserId">
+    </form>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const deleteConfirmationModal = document.getElementById('deleteConfirmationModal');
+            const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+            const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+            const userNameToDeleteSpan = document.getElementById('userNameToDelete');
+            const deleteForm = document.getElementById('deleteForm');
+            const formUserIdInput = document.getElementById('formUserId');
+
+            // Fungsi untuk mengarahkan ke halaman edit user
+            document.querySelectorAll('.edit-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const userId = this.getAttribute('data-user-id');
+                    console.log("Edit User ID:", userId);
+                    // PERBAIKAN DI SINI: Gunakan nilai dummy integer dan replace
+                    const editBaseUrl = "{{ url_for('edit_user', user_id=0) }}".replace('/0', '');
+                    window.location.href = editBaseUrl + '/' + userId;
+                });
+            });
+
+            // Fungsi untuk menampilkan modal konfirmasi hapus
+            document.querySelectorAll('.delete-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const userId = this.getAttribute('data-user-id');
+                    const userName = this.getAttribute('data-user-name');
+                    
+                    console.log("Delete User ID:", userId);
+                    console.log("Delete User Name:", userName);
+
+                    userNameToDeleteSpan.textContent = userName;
+                    formUserIdInput.value = userId;
+                    
+                    // PERBAIKAN DI SINI: Gunakan nilai dummy integer dan replace
+                    const deleteBaseUrl = "{{ url_for('delete_user', user_id=0) }}".replace('/0', '');
+                    deleteForm.action = deleteBaseUrl + '/' + userId;
+                    
+                    console.log("Final Delete Form Action URL:", deleteForm.action);
+                    
+                    deleteConfirmationModal.style.display = 'flex';
+                });
+            });
+
+            // Event listener untuk tombol 'Ya, Hapus' di modal
+            confirmDeleteBtn.addEventListener('click', function() {
+                deleteConfirmationModal.style.display = 'none';
+                deleteForm.submit();
+            });
+
+            // Event listener untuk tombol 'Batal' di modal
+            cancelDeleteBtn.addEventListener('click', function() {
+                deleteConfirmationModal.style.display = 'none';
+            });
+
+            // Sembunyikan modal jika user mengklik di luar area modal content
+            window.addEventListener('click', function(event) {
+                if (event.target == deleteConfirmationModal) {
+                    deleteConfirmationModal.style.display = 'none';
+                }
+            });
+        });
+    </script>
+</body>
+</html>

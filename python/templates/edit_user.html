@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Pengguna</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 50px; background-color: #f4f4f4; }
+        .container { background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); max-width: 600px; margin: auto; }
+        h1 { color: #333; text-align: center; }
+        form { display: flex; flex-direction: column; gap: 15px; }
+        label { font-weight: bold; }
+        input[type="text"], input[type="date"], input[type="submit"], select {
+            padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 1em;
+        }
+        input[type="submit"] {
+            background-color: #28a745; /* Warna hijau untuk update */
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        input[type="submit"]:hover { background-color: #218838; }
+        .back-button {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #6c757d;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 1em;
+            text-align: center;
+        }
+        .back-button:hover { background-color: #5a6268; }
+        .flash-message { padding: 10px; margin-bottom: 10px; border-radius: 5px; }
+        .flash-message.success { background-color: #d4edda; color: #155724; border: 1px solid #28a745; }
+        .flash-message.error { background-color: #f8d7da; color: #721c24; border: 1px solid #dc3545; }
+        .flash-message.info { background-color: #e0f7fa; color: #007bb6; border: 1px solid #007bb6; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Edit Pengguna</h1>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul class="flashes">
+                {% for category, message in messages %}
+                    <li class="flash-message {{ category }}">{{ message }}</li>
+                {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST">
+            <label for="nama">Nama Lengkap:</label>
+            {# Nama hanya boleh berisi huruf dan spasi, serta wajib diisi #}
+            <input type="text" id="nama" name="nama"
+                   pattern="[A-Za-z\s]+" title="Nama hanya boleh berisi huruf dan spasi."
+                   required value="{{ user.nama }}">
+
+            <label for="alamat">Alamat:</label>
+            {# Alamat wajib diisi #}
+            <input type="text" id="alamat" name="alamat"
+                   required value="{{ user.alamat if user.alamat else '' }}">
+
+            <label for="no_hp">Nomor HP:</label>
+            {# Nomor HP hanya boleh berisi angka (10-15 digit), serta wajib diisi #}
+            <input type="text" id="no_hp" name="no_hp"
+                   pattern="[0-9]{10,15}" title="Nomor HP harus berupa angka, 10-15 digit."
+                   placeholder="Contoh: 081234567890" required value="{{ user.no_hp if user.no_hp else '' }}">
+
+            <label for="tanggal_lahir">Tanggal Lahir:</label>
+            {# Tanggal Lahir wajib diisi dan tidak boleh di masa depan #}
+            <input type="date" id="tanggal_lahir" name="tanggal_lahir"
+                   max="{{ today }}" required value="{{ user.tanggal_lahir if user.tanggal_lahir else '' }}">
+
+            <label for="jenis_kelamin">Jenis Kelamin:</label>
+            {# Jenis Kelamin wajib dipilih #}
+            <select id="jenis_kelamin" name="jenis_kelamin" required>
+                <option value="">Pilih Jenis Kelamin</option>
+                <option value="Laki-laki" {% if user.jenis_kelamin == 'Laki-laki' %}selected{% endif %}>Laki-laki</option>
+                <option value="Perempuan" {% if user.jenis_kelamin == 'Perempuan' %}selected{% endif %}>Perempuan</option>
+            </select>
+
+            <input type="submit" value="Update Pengguna">
+        </form>
+
+        <a href="{{ url_for('manage_users') }}" class="back-button">Kembali ke Manajemen Pengguna</a>
+    </div>
+    <script>
+        // Set nilai maksimum untuk tanggal lahir menjadi hari ini
+        document.addEventListener('DOMContentLoaded', (event) => {
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0'); // January is 0!
+            const dd = String(today.getDate()).padStart(2, '0');
+            document.getElementById('tanggal_lahir').max = `${yyyy}-${mm}-${dd}`;
+        });
+    </script>
+</body>
+</html>

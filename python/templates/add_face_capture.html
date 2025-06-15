@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pengambilan Data Wajah</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 50px; background-color: #f4f4f4; }
+        .container { background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); max-width: 600px; margin: auto; text-align: center; }
+        h1 { color: #333; }
+        .status-box {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+            font-size: 1.1em;
+            color: #555;
+            min-height: 50px; /* Agar box tidak terlalu kecil */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        /* Gaya untuk pesan akhir */
+        .final-message {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 1.1em;
+            font-weight: bold;
+        }
+        .final-message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #28a745;
+        }
+        .final-message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #dc3545;
+        }
+
+        .back-button {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #6c757d;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+        .back-button:hover { background-color: #5a6268; }
+        /* Flash message styles */
+        .flash-message { padding: 10px; margin-bottom: 10px; border-radius: 5px; text-align: left; }
+        .flash-message.success { background-color: #d4edda; color: #155724; border: 1px solid #28a745; }
+        .flash-message.error { background-color: #f8d7da; color: #721c24; border: 1px solid #dc3545; }
+        .flash-message.info { background-color: #e0f7fa; color: #007bb6; border: 1px solid #007bb6; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Penangkapan Wajah</h1>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul class="flashes">
+                {% for category, message in messages %}
+                    <li class="flash-message {{ category }}">{{ message }}</li>
+                {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+
+        <p>Pengguna: <strong>{{ user_name }}</strong> (Face ID: {{ face_id }})</p>
+        <div class="status-box" id="capture-status">
+            {{ status }}
+        </div>
+        <p id="instruction-text">Tolong pastikan kamera Anda aktif. Jendela baru akan terbuka untuk proses penangkapan.</p>
+        
+        {# Area untuk menampilkan pesan akhir #}
+        <div id="final-message-area"></div>
+
+        <a href="{{ url_for('index') }}" class="back-button">Kembali ke Beranda</a>
+        <a href="{{ url_for('manage_users') }}" class="back-button" id="manage-users-button" style="display: none;">Kelola Pengguna</a>
+
+
+        <script>
+            let captureProcessRunning = true; // Variabel untuk melacak status proses
+            const statusBox = document.getElementById('capture-status');
+            const finalMessageArea = document.getElementById('final-message-area');
+            const instructionText = document.getElementById('instruction-text');
+            const manageUsersButton = document.getElementById('manage-users-button');
+
+            function checkCaptureStatus() {
+                if (!captureProcessRunning) {
+                    return; // Hentikan polling jika proses sudah selesai
+                }
+
+                fetch('{{ url_for("status_add_face") }}')
+                    .then(response => response.json())
+                    .then(data => {
+                        statusBox.innerText = data.status;
+                        
+                        if (!data.is_running) {
+                            captureProcessRunning = false; // Setel ke false jika proses tidak lagi berjalan
+                            console.log("Capture process finished. Outcome:", data.outcome);
+                            
+                            instructionText.style.display = 'none'; // Sembunyikan instruksi kamera
+                            manageUsersButton.style.display = 'inline-block'; // Tampilkan tombol kelola pengguna
+
+                            // Tampilkan pesan akhir berdasarkan outcome
+                            if (data.outcome === 'success') {
+                                finalMessageArea.innerHTML = '<div class="final-message success">Data wajah berhasil disimpan!</div>';
+                                // Opsional: Redirect ke halaman manajemen pengguna setelah beberapa detik
+                                // setTimeout(() => { window.location.href = "{{ url_for('manage_users') }}"; }, 3000);
+                            } else if (data.outcome === 'failure') {
+                                finalMessageArea.innerHTML = '<div class="final-message error">Pendaftaran wajah gagal. Silakan coba lagi.</div>';
+                            } else {
+                                finalMessageArea.innerHTML = '<div class="final-message info">Proses selesai dengan status tidak diketahui.</div>';
+                            }
+
+                        } else {
+                            setTimeout(checkCaptureStatus, 2000); // Lanjutkan polling
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error fetching capture status:', error);
+                        statusBox.innerText = 'Gagal mengambil status penangkapan.';
+                        finalMessageArea.innerHTML = '<div class="final-message error">Terjadi kesalahan saat berkomunikasi dengan server.</div>';
+                        captureProcessRunning = false; // Hentikan polling jika terjadi error
+                        instructionText.style.display = 'none'; // Sembunyikan instruksi kamera
+                        manageUsersButton.style.display = 'inline-block'; // Tampilkan tombol kelola pengguna
+                    });
+            }
+
+            // Mulai polling setelah halaman dimuat
+            setTimeout(checkCaptureStatus, 1000); // Mulai polling setelah 1 detik
+        </script>
+    </div>
+</body>
+</html>
