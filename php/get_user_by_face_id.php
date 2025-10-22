@@ -29,7 +29,7 @@ if ($conn->connect_error) {
 }
 
 // Sesuaikan query berdasarkan parameter yang diterima
-$stmt = $conn->prepare("SELECT user_id, nama, alamat, no_hp, tanggal_lahir, face_id FROM users WHERE " . $where_clause);
+$stmt = $conn->prepare("SELECT user_id, nama, alamat, no_hp, tanggal_lahir, jenis_kelamin, face_id FROM users WHERE " . $where_clause);
 $stmt->bind_param($param_type, $param_value);
 $stmt->execute();
 $result = $stmt->get_result();

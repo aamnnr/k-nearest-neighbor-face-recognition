@@ -49,6 +49,7 @@ CREATE TABLE `users` (
   `alamat` varchar(255) DEFAULT NULL,
   `no_hp` varchar(20) DEFAULT NULL,
   `tanggal_lahir` date DEFAULT NULL,
+  `jenis_kelamin` varchar(50) DEFAULT NULL,
   `face_id` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
