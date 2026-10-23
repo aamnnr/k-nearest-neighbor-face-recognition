@@ -2,7 +2,7 @@
 
 Sistem presensi yang mencatat kehadiran masuk dan pulang secara otomatis lewat pengenalan wajah. Untuk mencegah "nitip" absen, pengguna harus **berkedip** dan **tersenyum** di depan kamera sebelum presensinya dicatat. Pengguna dan rekap presensi dikelola lewat antarmuka web Flask.
 
-> Proyek Tugas Akhir. Repository ini **tidak** menyimpan data wajah, foto, atau data pribadi apa pun. Semua data biometrik dibuat secara lokal dan sudah diabaikan oleh `.gitignore`.
+> Proyek Tugas Akhir. Repository ini **tidak** menyimpan data wajah, foto, atau data pribadi apa pun. Semua data biometrik dibuat secara lokal.
 
 ## Fitur
 
@@ -113,7 +113,6 @@ pytest
 
 ## Keamanan & Privasi
 
-- Konfigurasi rahasia (`.env`, `php/config.local.php`) tidak ikut di-commit.
 - Seluruh endpoint PHP mewajibkan header `X-Api-Key`, memakai prepared statement, dan tidak menampilkan detail error ke klien.
 - Form Flask dilindungi CSRF. Mode debug mati secara default dan server hanya mendengarkan `127.0.0.1`.
 - Dataset wajah disimpan sebagai `.npz` (tanpa pickle). Foto wajah mentah hanya disimpan bila `SAVE_CAPTURE_IMAGES=1`.
