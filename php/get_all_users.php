@@ -1,35 +1,14 @@
 <?php
-include 'koneksi.php';
+/** GET -> daftar semua pengguna. */
 
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+declare(strict_types=1);
 
-header('Content-Type: application/json');
+require __DIR__ . '/lib/bootstrap.php';
 
-$response = [];
+api_init('GET');
 
-if ($conn->connect_error) {
-    $response = ["error" => "Koneksi database gagal: " . $conn->connect_error];
-    echo json_encode($response);
-    exit();
-}
+$result = db()->query(
+    'SELECT user_id, nama, alamat, no_hp, tanggal_lahir, jenis_kelamin, face_id FROM users ORDER BY nama ASC'
+);
 
-$sql = "SELECT user_id, nama, alamat, no_hp, tanggal_lahir, jenis_kelamin, face_id FROM users ORDER BY nama ASC";
-$result = $conn->query($sql);
-
-if ($result) {
-    if ($result->num_rows > 0) {
-        while($row = $result->fetch_assoc()) {
-            $response[] = $row;
-        }
-    } else {
-        $response = [];
-    }
-} else {
-    error_log("Database query failed in get_all_users.php: " . $conn->error);
-    $response = ["error" => "Failed to retrieve users due to query error."];
-}
-
-$conn->close();
-echo json_encode($response);
-?>
+json_success($result->fetch_all(MYSQLI_ASSOC));

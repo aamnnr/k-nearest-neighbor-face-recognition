@@ -1,136 +1,93 @@
-import cv2
-import pickle
-import numpy as np
-import os
+"""Ambil sampel wajah dari kamera lalu simpan ke dataset.
+
+Penggunaan:
+    python add_faces.py <face_id> <nama> [--replace]
+"""
+
+from __future__ import annotations
+
+import argparse
 import sys
 
-# Inisialisasi kamera video
-video = cv2.VideoCapture(1)
-if not video.isOpened():
-    print("Error: Tidak dapat membuka kamera. Pastikan kamera terhubung dan tidak digunakan oleh aplikasi lain.")
-    sys.exit(1)
+import cv2
+import numpy as np
 
-# Menentukan jalur direktori dasar tempat skrip ini berada
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# Direktori untuk menyimpan file model dan cascade
-DATA_DIR = os.path.join(BASE_DIR, 'data')
-# Direktori utama untuk menyimpan hasil capture foto wajah
-CAPTURES_ROOT_DIR = os.path.join(BASE_DIR, 'captured_faces')
+import face_store
+from config import CAPTURES_DIR, DATASET_PATH, settings
+from recognizer import crop_face, largest_face, load_cascade, open_camera
 
-# Memastikan direktori 'data' dan 'captured_faces' ada
-os.makedirs(DATA_DIR, exist_ok=True)
-os.makedirs(CAPTURES_ROOT_DIR, exist_ok=True)
+WINDOW_NAME = "Pengambilan Data Wajah"
 
-# Memuat model deteksi wajah Haar Cascade
-facedetect = cv2.CascadeClassifier(os.path.join(DATA_DIR, 'haarcascade_frontalface_default.xml'))
-if facedetect.empty():
-    print("Error: haarcascade_frontalface_default.xml tidak ditemukan atau tidak dapat dimuat. Pastikan file ada di folder 'data'.")
-    video.release()
-    sys.exit(1)
 
-faces_data = [] # List untuk menyimpan data wajah yang akan dilatih
-total_capture = 100 # Jumlah total gambar wajah yang akan diambil
+def safe_folder_name(name: str) -> str:
+    cleaned = "".join(c for c in name if c.isalnum() or c.isspace()).strip()
+    return "_".join(cleaned.split()) or "user"
 
-# Mengambil face_id dan user_name dari argumen baris perintah
-if len(sys.argv) > 2:
-    face_id = sys.argv[1]
-    user_name_raw = sys.argv[2]
-    # Membersihkan user_name agar aman untuk nama folder (misal: ganti spasi dengan underscore)
-    user_name_clean = "".join(c for c in user_name_raw if c.isalnum() or c.isspace()).strip()
-    user_name_folder = user_name_clean.replace(" ", "_")
-else:
-    print("Error: face_id dan user_name tidak diberikan sebagai argumen. Penggunaan: python add_faces.py <face_id> <user_name>")
-    video.release()
-    cv2.destroyAllWindows()
-    sys.exit(1)
 
-# Direktori khusus untuk menyimpan capture foto wajah pengguna ini dengan format (nama)_(face_id)
-USER_CAPTURE_DIR = os.path.join(CAPTURES_ROOT_DIR, f"{user_name_folder}_{face_id}")
-os.makedirs(USER_CAPTURE_DIR, exist_ok=True) # Buat folder khusus untuk user ini
+def capture_faces(camera_index: int, total: int) -> list[np.ndarray]:
+    detector = load_cascade("haarcascade_frontalface_default.xml")
+    camera = open_camera(camera_index)
+    samples: list[np.ndarray] = []
+    try:
+        while len(samples) < total:
+            ok, frame = camera.read()
+            if not ok:
+                print("Gagal mengambil frame dari kamera.", file=sys.stderr)
+                break
 
-print(f"Mulai penangkapan wajah untuk Face ID: {face_id} (Nama: {user_name_raw})")
-print(f"Gambar akan disimpan di: {USER_CAPTURE_DIR}")
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            # Hanya wajah terbesar yang diambil agar wajah orang lain di
+            # latar belakang tidak ikut tersimpan dengan label pengguna ini.
+            box = largest_face([tuple(f) for f in detector.detectMultiScale(gray, 1.3, 5)])
+            if box is not None:
+                samples.append(crop_face(frame, box))
+                x, y, w, h = box
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (50, 50, 255), 1)
 
-# Loop utama untuk menangkap frame dari kamera
-while True:
-    ret, frame = video.read()
-    if not ret:
-        print("Gagal mengambil frame. Keluar.")
-        break
+            cv2.putText(
+                frame, f"Capturing: {len(samples)}/{total}", (50, 50), cv2.FONT_HERSHEY_COMPLEX, 1, (50, 50, 255), 1
+            )
+            cv2.imshow(WINDOW_NAME, frame)
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                break
+    finally:
+        camera.release()
+        cv2.destroyAllWindows()
+    return samples
 
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) # Mengubah frame ke skala abu-abu
-    # Mendeteksi wajah dalam frame
-    faces = facedetect.detectMultiScale(gray, 1.3, 5)
 
-    for (x, y, w, h) in faces:
-        # Memotong area wajah dari frame
-        crop_img = frame[y:y+h, x:x+w, :]
-        # Mengubah ukuran gambar wajah menjadi 128x128 piksel
-        resized_img = cv2.resize(crop_img, (128, 128))
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("face_id", help="ID wajah unik pengguna (UUID dari database)")
+    parser.add_argument("user_name", help="Nama pengguna (untuk tampilan/nama folder)")
+    parser.add_argument("--replace", action="store_true", help="Ganti sampel wajah lama milik face_id ini")
+    parser.add_argument("--samples", type=int, default=settings.capture_samples, help="Jumlah sampel yang diambil")
+    args = parser.parse_args(argv)
 
-        # Jika jumlah capture belum mencapai target, simpan gambar dan tambahkan ke data
-        if len(faces_data) < total_capture:
-            # Menyimpan gambar yang di-resize ke folder khusus user
-            img_filename = os.path.join(USER_CAPTURE_DIR, f"{len(faces_data) + 1:03d}.jpg")
-            cv2.imwrite(img_filename, resized_img)
+    try:
+        face_id = face_store.validate_face_id(args.face_id)
+        print(f"Mulai pengambilan wajah untuk {args.user_name} (Face ID: {face_id})")
+        samples = capture_faces(settings.camera_index, args.samples)
+    except (ValueError, RuntimeError, FileNotFoundError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
 
-            faces_data.append(resized_img) # Menambahkan gambar ke list data untuk .pkl
+    if not samples:
+        print("Tidak ada wajah yang tertangkap. Data tidak disimpan.", file=sys.stderr)
+        return 1
 
-        # Menampilkan status penangkapan di frame
-        cv2.putText(frame, f"Capturing: {len(faces_data)}/{total_capture}", (50, 50), cv2.FONT_HERSHEY_COMPLEX, 1, (50, 50, 255), 1)
-        # Menggambar persegi panjang di sekitar wajah yang terdeteksi
-        cv2.rectangle(frame, (x, y), (x+w, y+h), (50, 50, 255), 1)
+    total = face_store.add_samples(DATASET_PATH, face_id, np.stack(samples), replace=args.replace)
 
-    # Menampilkan frame
-    cv2.imshow("Frame", frame)
-    k = cv2.waitKey(1) # Menunggu 1 milidetik untuk input keyboard
-    # Menghentikan loop jika tombol 'q' ditekan atau jumlah capture mencapai target
-    if k == ord('q') or len(faces_data) == total_capture:
-        break
+    if settings.save_capture_images:
+        user_dir = CAPTURES_DIR / f"{safe_folder_name(args.user_name)}_{face_id}"
+        user_dir.mkdir(parents=True, exist_ok=True)
+        for i, img in enumerate(samples, start=1):
+            cv2.imwrite(str(user_dir / f"{i:03d}.jpg"), img)
+        print(f"Gambar wajah disimpan di {user_dir}")
 
-# Melepaskan sumber daya kamera
-video.release()
-# Menutup semua jendela OpenCV
-cv2.destroyAllWindows()
+    print(f"Berhasil menyimpan {len(samples)} sampel wajah untuk {args.user_name}. Total sampel dataset: {total}.")
+    return 0
 
-# Memeriksa jika tidak ada wajah yang ditangkap
-if len(faces_data) == 0:
-    print("Tidak ada wajah yang ditangkap. Pembatalan penyimpanan ke file PKL.")
-    sys.exit(1)
 
-# Mengubah list data wajah menjadi array NumPy
-faces_data = np.asarray(faces_data)
-# Mengubah bentuk array menjadi 2D (jumlah sampel x fitur)
-faces_data = faces_data.reshape(len(faces_data), -1)
-
-names_pkl_path = os.path.join(DATA_DIR, 'names.pkl')
-faces_pkl_path = os.path.join(DATA_DIR, 'faces.pkl')
-
-# Memproses dan menyimpan label (face_id) ke names.pkl
-if not os.path.exists(names_pkl_path):
-    # Jika names.pkl belum ada, buat baru dengan face_id yang baru
-    names = [face_id] * len(faces_data)
-    with open(names_pkl_path, 'wb') as f:
-        pickle.dump(names, f)
-else:
-    # Jika names.pkl sudah ada, muat, tambahkan face_id yang baru, lalu simpan kembali
-    with open(names_pkl_path, 'rb') as f:
-        names = pickle.load(f)
-    names = names + [face_id] * len(faces_data)
-    with open(names_pkl_path, 'wb') as f:
-        pickle.dump(names, f)
-
-# Memproses dan menyimpan data wajah ke faces.pkl
-if not os.path.exists(faces_pkl_path):
-    # Jika faces.pkl belum ada, buat baru dengan data wajah yang baru
-    with open(faces_pkl_path, 'wb') as f:
-        pickle.dump(faces_data, f)
-else:
-    # Jika faces.pkl sudah ada, muat, tambahkan data wajah yang baru, lalu simpan kembali
-    with open(faces_pkl_path, 'rb') as f:
-        faces = pickle.load(f)
-    faces = np.append(faces, faces_data, axis=0) # Menggabungkan data wajah yang sudah ada dengan yang baru
-    with open(faces_pkl_path, 'wb') as f:
-        pickle.dump(faces, f)
-
-print(f"Pendaftaran wajah untuk Face ID {face_id} berhasil disimpan di PKL files dan {len(faces_data)} gambar disimpan di {USER_CAPTURE_DIR}.")
+if __name__ == "__main__":
+    sys.exit(main())

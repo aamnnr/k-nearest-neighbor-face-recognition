@@ -1,133 +1,124 @@
-# Sistem Presensi Pengenalan Wajah Berbasis IoT Menggunakan Metode K-Nearest Neighbor (KNN)
+# Sistem Presensi Pengenalan Wajah Menggunakan K-Nearest Neighbor (KNN)
 
-Sistem presensi ini memanfaatkan teknologi pengenalan wajah untuk mencatat kehadiran masuk dan pulang karyawan/mahasiswa secara otomatis. Dilengkapi dengan deteksi kedipan mata dan senyuman untuk mencegah "nitip" absen, serta antarmuka web sederhana berbasis Flask untuk manajemen pengguna dan rekap presensi.
+Sistem presensi yang mencatat kehadiran masuk dan pulang secara otomatis lewat pengenalan wajah. Untuk mencegah "nitip" absen, pengguna harus **berkedip** dan **tersenyum** di depan kamera sebelum presensinya dicatat. Pengguna dan rekap presensi dikelola lewat antarmuka web Flask.
 
-## Fitur Utama
+> Proyek Tugas Akhir. Repository ini **tidak** menyimpan data wajah, foto, atau data pribadi apa pun. Semua data biometrik dibuat secara lokal dan sudah diabaikan oleh `.gitignore`.
 
-* **Pengenalan Wajah Otomatis:** Mendeteksi dan mengenali wajah individu menggunakan model machine learning (KNN).
-* **Verifikasi Keaslian:** Deteksi kedipan mata dan senyuman untuk memastikan keberadaan fisik pengguna saat absen.
-* **Absen Masuk & Pulang:**
-    * Absen masuk: Dilakukan sebelum jam masuk.
-    * Absen terlambat: Jika absen masuk dilakukan 15 menit setelah jam masuk.
-    * Tidak bisa absen masuk: Jika terlambat lebih dari 15 menit.
-    * Absen pulang: Dilakukan saat atau setelah jam pulang.
-* **Manajemen Pengguna (Melalui Web Flask):**
-    * Pendaftaran pengguna baru dengan data diri (nama, alamat, no. HP, tanggal lahir, jenis kelamin) dan pengambilan data wajah.
-    * Melihat daftar semua pengguna terdaftar.
-    * Mengedit data diri pengguna.
-    * Menghapus data pengguna (termasuk semua catatan presensi dan data wajah terkait).
-* **Rekap Presensi (Melalui Web Flask):**
-    * Menampilkan rekap presensi harian dalam bentuk tabel.
-    * Filter data presensi berdasarkan tanggal yang dipilih secara otomatis.
-    * Mengunduh data presensi harian dalam format Excel (.xlsx).
-* **Penyimpanan Data:**
-    * Data personal pengguna dan catatan presensi disimpan dalam database MySQL.
-    * Data fitur wajah untuk model pengenalan disimpan dalam file `.pkl` (pickle) untuk efisiensi.
-    * Rekap presensi harian juga disimpan dalam file `.csv` sebagai backup lokal.
-* **Notifikasi Suara:** Memberikan umpan balik suara saat absen berhasil/gagal.
-* **Tampilan Jendela OpenCV Interaktif:** Menampilkan kotak pembatas wajah dan status (dikenali/tidak dikenal) secara *real-time*.
+## Fitur
 
-## Persyaratan Sistem
+- **Pengenalan wajah**: Haar Cascade untuk deteksi, lalu KNN (`scikit-learn`) untuk klasifikasi, ditambah ambang kemiripan *cosine* untuk menolak wajah yang tidak dikenal.
+- **Verifikasi keaslian**: kedipan mata (Eye Aspect Ratio dari landmark dlib) dan senyuman (Haar Cascade).
+- **Presensi masuk & pulang**:
+  - Masuk sebelum/tepat `JAM_MASUK`: status **TEPAT WAKTU**.
+  - Masuk setelah `JAM_MASUK`: status **TERLAMBAT (durasi)**.
+  - Masuk setelah `JAM_PULANG`: ditolak.
+  - Pulang sebelum `JAM_PULANG`: status **PULANG LEBIH AWAL (durasi)**. Pulang setelahnya: status **PULANG**.
+- **Web Flask**: registrasi pengguna, pengambilan wajah, ambil ulang wajah, edit/hapus pengguna, rekap presensi per tanggal, dan ekspor ke Excel.
+- **Notifikasi suara** (gTTS, Bahasa Indonesia).
 
-* Python 3.7+
-* MySQL/MariaDB
-* Webcam atau kamera yang terhubung
-* XAMPP (untuk server PHP dan MySQL)
+## Arsitektur
 
-## Instalasi
-
-1. **Clone Repository:**
-   ```bash
-   git clone <repository-url>
-   cd Sistem-Presensi-Pengenalan-Wajah-KNN
-   ```
-
-2. **Setup Database:**
-   - Jalankan XAMPP dan pastikan MySQL aktif.
-   - Buat database baru bernama `presensi_wajah`.
-   - Import file `php/sql/presensi_wajah.sql` ke database tersebut.
-
-3. **Setup Python Environment:**
-   - Buat virtual environment (opsional tapi direkomendasikan):
-     ```bash
-     python -m venv venv
-     venv\Scripts\activate  # Pada Windows
-     ```
-   - Install dependencies:
-     ```bash
-     pip install -r requirements.txt
-     ```
-
-4. **Konfigurasi:**
-   - Pastikan file-file model (seperti `haarcascade_frontalface_default.xml`, `shape_predictor_68_face_landmarks.dat`) ada di folder `python/data/`.
-   - Sesuaikan konfigurasi database di `php/koneksi.php` jika diperlukan.
-
-## Penggunaan
-
-1. **Jalankan Server PHP:**
-   - Pastikan XAMPP berjalan dan Apache aktif.
-   - Akses aplikasi web melalui browser di `http://localhost/presensi_wajah/php/index.php` (opsional).
-
-2. **Jalankan Aplikasi Flask:**
-   - Dari folder `python`, jalankan:
-     ```bash
-     python app.py
-     ```
-   - Akses web interface di `http://localhost:5000`.
-
-3. **Manajemen Pengguna:**
-   - Daftar pengguna baru melalui web interface.
-   - Jalankan `python add_faces.py <face_id> <user_name>` untuk menangkap data wajah.
-
-4. **Presensi:**
-   - Jalankan `python test.py` untuk memulai sistem presensi otomatis.
-   - Sistem akan mendeteksi wajah, memverifikasi dengan kedipan mata dan senyuman, lalu mencatat absen.
+```
+Browser ──> Flask (python/app.py) ──HTTP + X-Api-Key──> API PHP (php/*.php) ──> MySQL
+Kamera  ──> attendance.py ─────────HTTP + X-Api-Key──┘
+             └─ dataset wajah lokal: python/data/face_dataset.npz
+```
 
 ## Struktur Proyek
 
 ```
-├── README.md
+├── .env.example              # contoh konfigurasi Python (salin ke .env)
 ├── requirements.txt
 ├── php/
-│   ├── delete_user.php
-│   ├── edit_user.php
-│   ├── get_all_users.php
-│   ├── get_user_by_face_id.php
-│   ├── get_user_details.php
-│   ├── getData.php
-│   ├── index.php
-│   ├── input.php
-│   ├── koneksi.php
-│   ├── register.php
-│   └── sql/
-│       └── presensi_wajah.sql
-└── python/
-    ├── Absen/
-    ├── add_faces.py
-    ├── app.py
-    ├── background.png
-    ├── data/
-    │   ├── faces.pkl
-    │   ├── haarcascade_frontalface_default.xml
-    │   ├── haarcascade_smile.xml
-    │   ├── names.pkl
-    │   └── shape_predictor_68_face_landmarks.dat
-    ├── remove_face_data.py
-    ├── templates/
-    │   ├── add_face.html
-    │   ├── add_face_capture.html
-    │   ├── display_attendance.html
-    │   ├── edit_user.html
-    │   ├── index.html
-    │   ├── manage_users.html
-    │   └── register_user.html
-    └── test.py
+│   ├── config.example.php    # contoh konfigurasi DB + API key (salin ke config.local.php)
+│   ├── lib/bootstrap.php     # koneksi DB, autentikasi, helper JSON & validasi
+│   ├── register.php, edit_user.php, delete_user.php
+│   ├── get_user_details.php, get_all_users.php
+│   ├── getData.php, input.php
+│   └── sql/presensi_wajah.sql
+├── python/
+│   ├── app.py                # web Flask
+│   ├── attendance.py         # program presensi (kamera)
+│   ├── add_faces.py          # ambil sampel wajah
+│   ├── remove_face_data.py   # hapus sampel wajah
+│   ├── recognition_preview.py# uji coba pengenalan tanpa mencatat presensi
+│   ├── download_models.py    # unduh model landmark dlib
+│   ├── config.py, face_store.py, recognizer.py, liveness.py,
+│   │   attendance_rules.py, validation.py, php_client.py, speech.py
+│   ├── templates/, static/
+│   └── data/                 # model & dataset lokal (diabaikan git)
+└── tests/                    # unit test (pytest)
 ```
 
-## Kontribusi
+## Persyaratan
 
-Kontribusi sangat diterima! Silakan buat issue atau pull request untuk perbaikan dan fitur baru.
+- Python 3.9+ (disarankan 3.10–3.12; `dlib` butuh CMake + compiler C++ atau wheel siap pakai)
+- PHP 8.0+ dan MySQL/MariaDB (mis. XAMPP)
+- Webcam
+
+## Instalasi
+
+1. **Clone & siapkan environment Python**
+   ```bash
+   git clone https://github.com/aamnnr/k-nearest-neighbor-face-recognition.git
+   cd k-nearest-neighbor-face-recognition
+   python -m venv .venv
+   .venv\Scripts\activate        # Windows  (Linux/macOS: source .venv/bin/activate)
+   pip install -r requirements.txt
+   ```
+
+2. **Unduh model landmark dlib** (~100 MB, tidak disimpan di repo)
+   ```bash
+   python python/download_models.py
+   ```
+   Model ini dilatih dengan dataset iBUG 300-W yang **tidak boleh dipakai untuk tujuan komersial**.
+
+3. **Database**: buat database `presensi_wajah`, lalu import `php/sql/presensi_wajah.sql`.
+
+4. **API PHP**: salin folder proyek (atau buat symlink) ke `htdocs/presensi_wajah`, lalu:
+   ```bash
+   cp php/config.example.php php/config.local.php
+   ```
+   Isi kredensial database dan `api_key` dengan nilai acak:
+   ```bash
+   python -c "import secrets; print(secrets.token_hex(32))"
+   ```
+
+5. **Konfigurasi Python**:
+   ```bash
+   cp .env.example .env
+   ```
+   Isi `FLASK_SECRET_KEY` (nilai acak) dan `PHP_API_KEY` (**sama** dengan `api_key` di `config.local.php`). Sesuaikan juga `JAM_MASUK`, `JAM_PULANG`, dan `CAMERA_INDEX`.
+
+## Penggunaan
+
+Jalankan dari folder `python/`:
+
+| Perintah | Fungsi |
+|---|---|
+| `python app.py` | Web manajemen di `http://127.0.0.1:5000` |
+| `python attendance.py` | Program presensi (tekan `q` untuk keluar) |
+| `python recognition_preview.py` | Uji coba pengenalan wajah tanpa mencatat presensi |
+| `python add_faces.py <face_id> <nama> [--replace]` | Ambil sampel wajah secara manual |
+| `python remove_face_data.py <face_id>` | Hapus sampel wajah secara manual |
+
+Pengguna baru didaftarkan lewat web. Setelah data diri tersimpan, jendela kamera terbuka untuk mengambil sampel wajah. Mulai ulang `attendance.py` setelah menambah atau menghapus pengguna agar model dilatih ulang.
+
+## Pengujian
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+## Keamanan & Privasi
+
+- Konfigurasi rahasia (`.env`, `php/config.local.php`) tidak ikut di-commit.
+- Seluruh endpoint PHP mewajibkan header `X-Api-Key`, memakai prepared statement, dan tidak menampilkan detail error ke klien.
+- Form Flask dilindungi CSRF. Mode debug mati secara default dan server hanya mendengarkan `127.0.0.1`.
+- Dataset wajah disimpan sebagai `.npz` (tanpa pickle). Foto wajah mentah hanya disimpan bila `SAVE_CAPTURE_IMAGES=1`.
+- Sistem ini mengolah **data biometrik**. Minta persetujuan setiap orang yang didaftarkan, dan jangan pernah meng-commit isi `python/data/` atau `python/captured_faces/`.
 
 ## Lisensi
 
-Proyek ini menggunakan lisensi MIT. Lihat file LICENSE untuk detail lebih lanjut.
+[MIT](LICENSE)

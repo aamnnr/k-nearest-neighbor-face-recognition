@@ -1,0 +1,24 @@
+{# Field form data diri, dipakai oleh register_user.html dan edit_user.html #}
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+<label for="nama">Nama Lengkap:</label>
+<input type="text" id="nama" name="nama" maxlength="100" required
+       title="Nama hanya boleh berisi huruf dan spasi." value="{{ form.nama }}">
+
+<label for="alamat">Alamat:</label>
+<input type="text" id="alamat" name="alamat" maxlength="255" required value="{{ form.alamat }}">
+
+<label for="no_hp">Nomor HP:</label>
+<input type="text" id="no_hp" name="no_hp" pattern="[0-9]{10,15}" inputmode="numeric" required
+       title="Nomor HP harus berupa angka, 10-15 digit." placeholder="Contoh: 081234567890" value="{{ form.no_hp }}">
+
+<label for="tanggal_lahir">Tanggal Lahir:</label>
+<input type="date" id="tanggal_lahir" name="tanggal_lahir" max="{{ today }}" required value="{{ form.tanggal_lahir }}">
+
+<label for="jenis_kelamin">Jenis Kelamin:</label>
+<select id="jenis_kelamin" name="jenis_kelamin" required>
+    <option value="">Pilih Jenis Kelamin</option>
+    {% for option in ['Laki-laki', 'Perempuan'] %}
+        <option value="{{ option }}" {% if form.jenis_kelamin == option %}selected{% endif %}>{{ option }}</option>
+    {% endfor %}
+</select>

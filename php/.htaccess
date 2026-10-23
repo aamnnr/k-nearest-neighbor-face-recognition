@@ -1,0 +1,6 @@
+# Blokir akses langsung ke file konfigurasi.
+<FilesMatch "^config\.(local|example)\.php$">
+    Require all denied
+</FilesMatch>
+
+Options -Indexes

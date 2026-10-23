@@ -1,86 +1,73 @@
 <?php
-include 'koneksi.php';
+/**
+ * POST user_id, tanggal_absen, waktu_absen, tipe_absen (masuk|pulang), status
+ * -> {result: "berhasil" | "sudah" | "belum_masuk"}
+ */
 
-// Aktifkan pelaporan error untuk debugging (Hapus di produksi!)
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+declare(strict_types=1);
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $user_id = $_POST['user_id'];
-    $tanggal_absen = $_POST['tanggal_absen']; 
-    $waktu_absen = $_POST['waktu_absen'];    
-    $tipe_absen = $_POST['tipe_absen'];
-    $status = $_POST['status'];
+require __DIR__ . '/lib/bootstrap.php';
 
-    $response = "gagal";
+api_init('POST');
 
-    if ($conn->connect_error) {
-        $response = "error_koneksi: " . $conn->connect_error;
-        echo $response;
-        exit();
-    }
+$user_id = input_positive_int($_POST, 'user_id');
+$tanggal = input_string($_POST, 'tanggal_absen');
+$waktu = input_string($_POST, 'waktu_absen');
+$tipe = input_string($_POST, 'tipe_absen');
+$status = mb_substr(input_string($_POST, 'status'), 0, 50);
 
-    if ($tipe_absen == 'masuk') {
-        // Cek apakah sudah absen masuk hari ini untuk user_id dan tanggal ini
-        $stmt_check = $conn->prepare("SELECT COUNT(*) FROM absensi WHERE user_id = ? AND tanggal = ?");
-        $stmt_check->bind_param("is", $user_id, $tanggal_absen);
-        $stmt_check->execute();
-        $stmt_check->bind_result($count);
-        $stmt_check->fetch();
-        $stmt_check->close();
-
-        if ($count > 0) {
-            $response = "sudah"; // Sudah ada entri absen masuk untuk hari ini
-        } else {
-            // Lakukan INSERT untuk absen masuk
-            $stmt_insert = $conn->prepare("INSERT INTO absensi (user_id, tanggal, waktu_masuk, status_masuk) VALUES (?, ?, ?, ?)");
-            $stmt_insert->bind_param("isss", $user_id, $tanggal_absen, $waktu_absen, $status);
-            if ($stmt_insert->execute()) {
-                $response = "berhasil";
-            } else {
-                // Tangani error INSERT (misal, duplicate entry jika UNIQUE KEY diaktifkan tapi logic cek gagal)
-                $response = "gagal_insert_masuk: " . $conn->error;
-            }
-            $stmt_insert->close();
-        }
-    } elseif ($tipe_absen == 'pulang') {
-        // Cek apakah sudah ada entri absen masuk untuk hari ini dan user_id ini
-        $stmt_check_masuk = $conn->prepare("SELECT COUNT(*) FROM absensi WHERE user_id = ? AND tanggal = ? AND waktu_masuk IS NOT NULL");
-        $stmt_check_masuk->bind_param("is", $user_id, $tanggal_absen);
-        $stmt_check_masuk->execute();
-        $stmt_check_masuk->bind_result($count_masuk);
-        $stmt_check_masuk->fetch();
-        $stmt_check_masuk->close();
-
-        if ($count_masuk == 0) {
-            $response = "belum_masuk"; // Belum absen masuk, tidak bisa absen pulang
-        } else {
-            // Cek apakah sudah absen pulang hari ini
-            $stmt_check_pulang = $conn->prepare("SELECT COUNT(*) FROM absensi WHERE user_id = ? AND tanggal = ? AND waktu_pulang IS NOT NULL");
-            $stmt_check_pulang->bind_param("is", $user_id, $tanggal_absen);
-            $stmt_check_pulang->execute();
-            $stmt_check_pulang->bind_result($count_pulang);
-            $stmt_check_pulang->fetch();
-            $stmt_check_pulang->close();
-
-            if ($count_pulang > 0) {
-                $response = "sudah"; // Sudah absen pulang
-            } else {
-                // Lakukan UPDATE untuk absen pulang pada baris yang sama
-                $stmt_update = $conn->prepare("UPDATE absensi SET waktu_pulang = ?, status_pulang = ? WHERE user_id = ? AND tanggal = ?");
-                $stmt_update->bind_param("ssis", $waktu_absen, $status, $user_id, $tanggal_absen);
-                if ($stmt_update->execute()) {
-                    $response = "berhasil";
-                } else {
-                    $response = "gagal_update_pulang: " . $conn->error;
-                }
-                $stmt_update->close();
-            }
-        }
-    }
-    echo $response;
-    $conn->close();
-} else {
-    echo "Metode request tidak valid.";
+if ($user_id === null) {
+    json_error('User ID tidak valid.', 422);
 }
-?>
+if (!is_valid_date($tanggal) || !is_valid_time($waktu)) {
+    json_error('Format tanggal/waktu absen tidak valid.', 422);
+}
+if (!in_array($tipe, ['masuk', 'pulang'], true)) {
+    json_error('Tipe absen tidak valid.', 422);
+}
+
+$record = fetch_one(
+    'SELECT waktu_masuk, waktu_pulang FROM absensi WHERE user_id = ? AND tanggal = ?',
+    'is',
+    $user_id,
+    $tanggal
+);
+
+if ($tipe === 'masuk') {
+    if ($record !== null) {
+        json_success(['result' => 'sudah']);
+    }
+    $stmt = db()->prepare(
+        'INSERT INTO absensi (user_id, tanggal, waktu_masuk, status_masuk) VALUES (?, ?, ?, ?)'
+    );
+    $stmt->bind_param('isss', $user_id, $tanggal, $waktu, $status);
+    try {
+        $stmt->execute();
+    } catch (mysqli_sql_exception $e) {
+        // 1062 = duplicate entry (UNIQUE user_id + tanggal): request bersamaan
+        if ($e->getCode() === 1062) {
+            json_success(['result' => 'sudah']);
+        }
+        throw $e;
+    }
+    $stmt->close();
+    json_success(['result' => 'berhasil']);
+}
+
+// tipe === 'pulang'
+if ($record === null || $record['waktu_masuk'] === null) {
+    json_success(['result' => 'belum_masuk']);
+}
+if ($record['waktu_pulang'] !== null) {
+    json_success(['result' => 'sudah']);
+}
+
+$stmt = db()->prepare(
+    'UPDATE absensi SET waktu_pulang = ?, status_pulang = ? WHERE user_id = ? AND tanggal = ? AND waktu_pulang IS NULL'
+);
+$stmt->bind_param('ssis', $waktu, $status, $user_id, $tanggal);
+$stmt->execute();
+$updated = $stmt->affected_rows;
+$stmt->close();
+
+json_success(['result' => $updated > 0 ? 'berhasil' : 'sudah']);

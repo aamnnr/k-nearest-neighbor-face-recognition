@@ -1,29 +1,25 @@
 <?php
-include 'koneksi.php';
+/** POST user_id -> hapus pengguna (catatan presensi ikut terhapus lewat ON DELETE CASCADE). */
 
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+declare(strict_types=1);
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $user_id = $_POST['user_id'];
+require __DIR__ . '/lib/bootstrap.php';
 
-    if ($conn->connect_error) {
-        echo "error_koneksi: " . $conn->connect_error;
-        exit();
-    }
+api_init('POST');
 
-    // Hapus pengguna dari tabel 'users'
-    $stmt = $conn->prepare("DELETE FROM users WHERE user_id = ?");
-    $stmt->bind_param("i", $user_id);
-
-    if ($stmt->execute()) {
-        echo "berhasil";
-    } else {
-        echo "gagal: " . $conn->error;
-    }
-    $stmt->close();
-    $conn->close();
-} else {
-    echo "Metode request tidak valid.";
+$user_id = input_positive_int($_POST, 'user_id');
+if ($user_id === null) {
+    json_error('User ID tidak valid.', 422);
 }
-?>
+
+$stmt = db()->prepare('DELETE FROM users WHERE user_id = ?');
+$stmt->bind_param('i', $user_id);
+$stmt->execute();
+$deleted = $stmt->affected_rows;
+$stmt->close();
+
+if ($deleted === 0) {
+    json_error('Pengguna tidak ditemukan.', 404);
+}
+
+json_success(['user_id' => $user_id]);
