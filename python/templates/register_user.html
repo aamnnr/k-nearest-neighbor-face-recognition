@@ -1,12 +1,21 @@
 {% extends "base.html" %}
-{% block title %}Daftar Pengguna Baru{% endblock %}
-{% block heading %}<h1>Daftar Pengguna Baru</h1>{% endblock %}
+{% from "_macros.html" import icon with context %}
+{% block title %}Daftar Pengguna{% endblock %}
+{% block heading %}Daftar Pengguna Baru{% endblock %}
+{% block subheading %}<p>Isi data diri, lalu sistem akan membuka kamera untuk mengambil sampel wajah.</p>{% endblock %}
+
 {% block content %}
-    <form class="user-form" method="POST" action="{{ url_for('register_user') }}">
-        {% include "_user_form_fields.html" %}
-        <input type="submit" class="btn btn-primary" value="Daftar & Lanjut Ambil Wajah">
-    </form>
-    <div class="actions">
-        <a href="{{ url_for('index') }}" class="btn btn-secondary">Kembali ke Beranda</a>
+<section class="card form-card">
+    <div class="card-header">
+        <h2 class="card-title"><span class="dot"></span>Data Diri</h2>
+        <span class="pill">Langkah 1 dari 2</span>
     </div>
+    <form method="POST" action="{{ url_for('register_user') }}">
+        {% include "_user_form_fields.html" %}
+        <div class="form-actions">
+            <a href="{{ url_for('manage_users') }}" class="btn btn-outline">Batal</a>
+            <button type="submit" class="btn btn-primary">{{ icon('camera') }} Simpan & Ambil Wajah</button>
+        </div>
+    </form>
+</section>
 {% endblock %}

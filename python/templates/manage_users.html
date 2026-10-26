@@ -1,65 +1,108 @@
 {% extends "base.html" %}
-{% block title %}Kelola Pengguna{% endblock %}
-{% block container_class %}wide{% endblock %}
-{% block heading %}<h1>Daftar Pengguna Sistem</h1>{% endblock %}
+{% from "_macros.html" import icon, avatar with context %}
+{% block title %}Pengguna{% endblock %}
+{% block heading %}Pengguna{% endblock %}
+{% block subheading %}<p>Kelola data diri dan data wajah setiap pengguna terdaftar.</p>{% endblock %}
+{% block actions %}
+    <a class="btn btn-primary" href="{{ url_for('register_user') }}">{{ icon('user-plus') }} Tambah Pengguna</a>
+{% endblock %}
+
 {% block content %}
-    <a href="{{ url_for('register_user') }}" class="btn btn-primary">Tambah Pengguna Baru</a>
+<section class="card">
+    <div class="card-header">
+        <div>
+            <h2 class="card-title"><span class="dot"></span>Daftar Pengguna</h2>
+            <p class="card-subtitle">{{ users | length }} pengguna terdaftar</p>
+        </div>
+        {% if users %}
+        <label class="search">
+            {{ icon('search') }}
+            <input class="input" type="search" id="user-search" placeholder="Cari nama atau nomor HP…" aria-label="Cari pengguna">
+        </label>
+        {% endif %}
+    </div>
 
     {% if users %}
+    <div class="table-wrap">
         <table>
             <thead>
                 <tr>
-                    <th>ID User</th>
                     <th>Nama</th>
-                    <th>Alamat</th>
-                    <th>No. HP</th>
-                    <th>Tanggal Lahir</th>
+                    <th>Nomor HP</th>
                     <th>Jenis Kelamin</th>
-                    <th>Aksi</th>
+                    <th>Tanggal Lahir</th>
+                    <th>Alamat</th>
+                    <th class="text-right">Aksi</th>
                 </tr>
             </thead>
             <tbody>
                 {% for user in users %}
-                <tr>
-                    <td>{{ user.user_id }}</td>
-                    <td>{{ user.nama }}</td>
-                    <td>{{ user.alamat or '-' }}</td>
+                <tr data-search="{{ (user.nama ~ ' ' ~ (user.no_hp or '')) | lower }}">
+                    <td>
+                        <a class="person" href="{{ url_for('user_detail', user_id=user.user_id) }}">
+                            {{ avatar(user.nama) }}
+                            <span><span class="person-name">{{ user.nama }}</span><br><span class="person-sub">ID {{ user.user_id }}</span></span>
+                        </a>
+                    </td>
                     <td>{{ user.no_hp or '-' }}</td>
-                    <td>{{ user.tanggal_lahir or '-' }}</td>
                     <td>{{ user.jenis_kelamin or '-' }}</td>
-                    <td class="action-buttons">
-                        <a class="btn btn-warning btn-sm" href="{{ url_for('edit_user', user_id=user.user_id) }}">Edit</a>
-                        <form method="POST" action="{{ url_for('recapture_face', user_id=user.user_id) }}"
-                              data-confirm="Ambil ulang data wajah {{ user.nama }}? Data wajah lama akan diganti.">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="btn btn-primary btn-sm">Ambil Ulang Wajah</button>
-                        </form>
-                        <form method="POST" action="{{ url_for('delete_user', user_id=user.user_id) }}"
-                              data-confirm="Hapus pengguna {{ user.nama }}? Semua catatan presensi dan data wajahnya akan dihapus permanen.">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="btn btn-danger btn-sm">Hapus</button>
-                        </form>
+                    <td>{{ user.tanggal_lahir | date_str_id }}</td>
+                    <td>{{ user.alamat or '-' }}</td>
+                    <td class="text-right">
+                        <div class="btn-group">
+                            <a class="btn btn-icon sm btn-outline" href="{{ url_for('user_detail', user_id=user.user_id) }}"
+                               title="Lihat kehadiran" aria-label="Lihat kehadiran {{ user.nama }}">{{ icon('eye') }}</a>
+                            <a class="btn btn-icon sm btn-outline" href="{{ url_for('edit_user', user_id=user.user_id) }}"
+                               title="Edit" aria-label="Edit {{ user.nama }}">{{ icon('pencil') }}</a>
+                            <form method="POST" action="{{ url_for('recapture_face', user_id=user.user_id) }}"
+                                  data-confirm="Ambil ulang data wajah {{ user.nama }}? Data wajah lama akan diganti.">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-icon sm btn-outline" title="Ambil ulang wajah"
+                                        aria-label="Ambil ulang wajah {{ user.nama }}">{{ icon('camera') }}</button>
+                            </form>
+                            <form method="POST" action="{{ url_for('delete_user', user_id=user.user_id) }}"
+                                  data-confirm="Hapus pengguna {{ user.nama }}? Semua catatan presensi dan data wajahnya akan dihapus permanen.">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-icon sm btn-danger" title="Hapus"
+                                        aria-label="Hapus {{ user.nama }}">{{ icon('trash') }}</button>
+                            </form>
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
+                <tr id="no-result" class="hidden"><td colspan="6" class="empty">Tidak ada pengguna yang cocok.</td></tr>
             </tbody>
         </table>
-    {% else %}
-        <p class="no-data">Belum ada pengguna terdaftar.</p>
-    {% endif %}
-
-    <div class="actions">
-        <a href="{{ url_for('index') }}" class="btn btn-secondary">Kembali ke Beranda</a>
     </div>
+    {% else %}
+    <div class="empty">
+        {{ icon('users') }}
+        <p>Belum ada pengguna terdaftar.</p>
+    </div>
+    {% endif %}
+</section>
 {% endblock %}
+
 {% block scripts %}
 <script>
     document.querySelectorAll('form[data-confirm]').forEach(function (form) {
         form.addEventListener('submit', function (event) {
-            if (!window.confirm(form.dataset.confirm)) {
-                event.preventDefault();
-            }
+            if (!window.confirm(form.dataset.confirm)) event.preventDefault();
         });
     });
+
+    var search = document.getElementById('user-search');
+    if (search) {
+        search.addEventListener('input', function () {
+            var query = this.value.trim().toLowerCase();
+            var visible = 0;
+            document.querySelectorAll('tr[data-search]').forEach(function (row) {
+                var match = row.dataset.search.indexOf(query) !== -1;
+                row.classList.toggle('hidden', !match);
+                if (match) visible++;
+            });
+            document.getElementById('no-result').classList.toggle('hidden', visible > 0);
+        });
+    }
 </script>
 {% endblock %}

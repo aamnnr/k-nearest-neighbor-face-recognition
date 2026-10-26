@@ -13,7 +13,11 @@ Sistem presensi yang mencatat kehadiran masuk dan pulang secara otomatis lewat p
   - Masuk setelah `JAM_MASUK`: status **TERLAMBAT (durasi)**.
   - Masuk setelah `JAM_PULANG`: ditolak.
   - Pulang sebelum `JAM_PULANG`: status **PULANG LEBIH AWAL (durasi)**. Pulang setelahnya: status **PULANG**.
-- **Web Flask**: registrasi pengguna, pengambilan wajah, ambil ulang wajah, edit/hapus pengguna, rekap presensi per tanggal, dan ekspor ke Excel.
+- **Dashboard web (Flask)**:
+  - Ringkasan hari ini: jumlah hadir, terlambat, dan belum hadir.
+  - Detail kehadiran per pengguna: strip status harian dalam sebulan, rata-rata jam masuk/pulang, dan timeline jam kerja.
+  - Registrasi pengguna, pengambilan dan pengambilan ulang wajah, edit/hapus pengguna.
+  - Rekap presensi per tanggal dan ekspor ke Excel.
 - **Notifikasi suara** (gTTS, Bahasa Indonesia).
 
 ## Arsitektur

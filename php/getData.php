@@ -1,5 +1,5 @@
 <?php
-/** GET [?tanggal=YYYY-MM-DD] [&user_id=<int>] -> daftar catatan presensi. */
+/** GET [?tanggal=YYYY-MM-DD | ?bulan=YYYY-MM] [&user_id=<int>] -> daftar catatan presensi. */
 
 declare(strict_types=1);
 
@@ -7,7 +7,7 @@ require __DIR__ . '/lib/bootstrap.php';
 
 api_init('GET');
 
-$sql = 'SELECT a.absen_id, u.nama, a.tanggal, a.waktu_masuk, a.status_masuk, a.waktu_pulang, a.status_pulang
+$sql = 'SELECT a.absen_id, a.user_id, u.nama, a.tanggal, a.waktu_masuk, a.status_masuk, a.waktu_pulang, a.status_pulang
         FROM absensi a
         JOIN users u ON a.user_id = u.user_id';
 
@@ -33,6 +33,15 @@ if (!empty($_GET['tanggal'])) {
     $conditions[] = 'a.tanggal = ?';
     $params[] = $tanggal;
     $types .= 's';
+} elseif (!empty($_GET['bulan'])) {
+    $bulan = input_string($_GET, 'bulan');
+    if (!is_valid_date($bulan . '-01')) {
+        json_error('Format bulan tidak valid (YYYY-MM).', 422);
+    }
+    $first = $bulan . '-01';
+    $conditions[] = 'a.tanggal BETWEEN ? AND LAST_DAY(?)';
+    array_push($params, $first, $first);
+    $types .= 'ss';
 }
 
 if ($conditions) {

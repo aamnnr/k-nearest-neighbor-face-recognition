@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, avatar, status_badge with context %}
+{% block title %}{{ user.nama }}{% endblock %}
+{% block heading %}Detail Kehadiran{% endblock %}
+{% block subheading %}<p>Pantau kehadiran {{ user.nama }} dan riwayat jam kerjanya per bulan.</p>{% endblock %}
+{% block actions %}
+    <a class="btn btn-icon btn-outline" href="{{ url_for('user_detail', user_id=user.user_id, bulan=prev_month) }}"
+       title="Bulan sebelumnya" aria-label="Bulan sebelumnya">{{ icon('chevron-left') }}</a>
+    <form method="GET" action="{{ url_for('user_detail', user_id=user.user_id) }}">
+        <label class="hidden" for="bulan">Pilih bulan</label>
+        <input class="input" type="month" id="bulan" name="bulan" value="{{ bulan }}" aria-label="Pilih bulan">
+    </form>
+    <a class="btn btn-icon btn-outline" href="{{ url_for('user_detail', user_id=user.user_id, bulan=next_month) }}"
+       title="Bulan berikutnya" aria-label="Bulan berikutnya">{{ icon('chevron-right') }}</a>
+{% endblock %}
+
+{% block content %}
+<div class="detail-grid">
+    <section class="card">
+        <div class="card-header">
+            <h2 class="card-title"><span class="dot"></span>Data Pengguna</h2>
+            <div class="btn-group">
+                <a class="btn btn-icon btn-outline" href="{{ url_for('edit_user', user_id=user.user_id) }}"
+                   title="Edit data" aria-label="Edit data">{{ icon('pencil') }}</a>
+                <form method="POST" action="{{ url_for('recapture_face', user_id=user.user_id) }}"
+                      data-confirm="Ambil ulang data wajah {{ user.nama }}? Data wajah lama akan diganti.">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-primary">{{ icon('camera') }} Ambil Ulang Wajah</button>
+                </form>
+            </div>
+        </div>
+        <div class="profile">
+            <div class="profile-avatar">
+                {{ avatar(user.nama, 'lg') }}
+                <span class="badge plain present">{{ user.jenis_kelamin or '-' }}</span>
+            </div>
+            <div>
+                <div class="profile-name">{{ user.nama }}</div>
+                <div class="profile-fields">
+                    <div><div class="field-label">Nomor HP</div><div class="field-value">{{ user.no_hp or '-' }}</div></div>
+                    <div><div class="field-label">Tanggal Lahir</div><div class="field-value">{{ user.tanggal_lahir | date_str_id }}</div></div>
+                    <div><div class="field-label">Alamat</div><div class="field-value">{{ user.alamat or '-' }}</div></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="stats-grid two" aria-label="Ringkasan {{ month_label }}">
+        <div class="stat-card">
+            <div class="stat-head">Total Hadir <span class="stat-icon green">{{ icon('user-check') }}</span></div>
+            <div class="stat-value">{{ summary.hadir }}<small>hari</small></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-head">Terlambat <span class="stat-icon orange">{{ icon('timer') }}</span></div>
+            <div class="stat-value">{{ summary.terlambat }}<small>kali</small></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-head">Rata-rata Masuk <span class="stat-icon">{{ icon('log-in') }}</span></div>
+            <div class="stat-value">{{ summary.avg_masuk | hhmm }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-head">Rata-rata Pulang <span class="stat-icon violet">{{ icon('log-out') }}</span></div>
+            <div class="stat-value">{{ summary.avg_pulang | hhmm }}</div>
+        </div>
+    </section>
+</div>
+
+<section class="card">
+    <div class="card-header">
+        <div>
+            <h2 class="card-title">Kehadiran · {{ month_label }}</h2>
+            <p class="card-subtitle">Total jam kerja: {{ summary.total_kerja_label }} · Tidak hadir: {{ summary.tidak_hadir }} hari</p>
+        </div>
+        <div class="legend">
+            <span><i class="present"></i>Tepat Waktu</span>
+            <span><i class="late"></i>Terlambat</span>
+            <span><i class="early"></i>Pulang Awal</span>
+            <span><i class="absent"></i>Tidak Hadir</span>
+            <span><i class="weekend"></i>Akhir Pekan</span>
+        </div>
+    </div>
+    <div class="day-strip" id="day-strip">
+        {% for cell in cells %}
+        <div class="day {{ 'today' if cell.is_today }} {{ 'muted' if cell.status in ('weekend', 'upcoming') }}"
+             title="{{ cell.day | date_id }} — {{ cell.label }}{% if cell.record %} ({{ cell.record.waktu_masuk | short_time }}–{{ cell.record.waktu_pulang | short_time }}){% endif %}">
+            <span class="day-num">{{ '%02d' % cell.day.day }}</span>
+            <span class="day-name">{{ day_names[cell.day.weekday()] }}</span>
+            <span class="day-dot {{ cell.status }}">
+                {% if cell.status == 'present' %}{{ icon('check') }}
+                {% elif cell.status == 'late' %}{{ icon('clock') }}
+                {% elif cell.status == 'early' %}{{ icon('log-out') }}
+                {% elif cell.status == 'absent' %}{{ icon('x') }}{% endif %}
+            </span>
+            <span class="hidden">{{ cell.label }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="card">
+    <div class="card-header">
+        <div>
+            <h2 class="card-title">Riwayat Presensi</h2>
+            <p class="card-subtitle">Garis putus-putus hijau = jam masuk, merah = jam pulang ({{ jam_kerja }})</p>
+        </div>
+    </div>
+    {% if timeline.rows %}
+    {% set hour_count = timeline.hours | length - 1 %}
+    <div class="timeline-scroll">
+        <div class="timeline">
+            <div class="tl-head">
+                <div>Tanggal</div>
+                <div class="tl-axis">
+                    {% for label, pct in timeline.hours %}
+                    {% if not loop.last %}<span style="left: {{ pct }}%">{{ label }}</span>{% endif %}
+                    {% endfor %}
+                </div>
+                <div></div>
+            </div>
+            {% for row in timeline.rows %}
+            <div class="tl-row">
+                <div class="tl-date">
+                    <span class="badge plain">{{ day_names[row.day.weekday()] }}</span>{{ row.day | date_id }}
+                </div>
+                <div class="tl-track" style="--hour-width: calc(100% / {{ hour_count }}); --hour-offset: 0">
+                    <span class="tl-marker in" style="left: {{ timeline.jam_masuk_pct }}%"></span>
+                    <span class="tl-marker out" style="left: {{ timeline.jam_pulang_pct }}%"></span>
+                    <div class="tl-bar {{ row.status }} {{ 'open' if row.open_ended }}"
+                         style="left: {{ row.start_pct }}%; width: {{ row.width_pct }}%">
+                        <strong>{{ row.masuk | hhmm }} – {{ row.pulang | hhmm if row.pulang else '…' }}</strong>
+                        <span>{{ row.duration_label }}</span>
+                    </div>
+                </div>
+                <div class="tl-status">{{ status_badge(row.status) }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="empty">{{ icon('calendar') }}<p>Belum ada catatan presensi pada {{ month_label }}.</p></div>
+    {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.getElementById('bulan').addEventListener('change', function () { this.form.submit(); });
+    document.querySelectorAll('form[data-confirm]').forEach(function (form) {
+        form.addEventListener('submit', function (event) {
+            if (!window.confirm(form.dataset.confirm)) event.preventDefault();
+        });
+    });
+    // Gulirkan strip kehadiran ke hari ini
+    var strip = document.getElementById('day-strip');
+    var today = strip.querySelector('.today');
+    if (today) strip.scrollLeft = today.offsetLeft - strip.offsetLeft - strip.clientWidth / 2;
+</script>
+{% endblock %}

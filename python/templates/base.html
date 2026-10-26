@@ -1,25 +1,67 @@
+{% from "_macros.html" import icon, flashes with context %}
+{% set nav_items = [
+    ('index', 'home', 'Dashboard', ['index']),
+    ('manage_users', 'users', 'Pengguna', ['manage_users', 'user_detail', 'edit_user', 'add_face_capture']),
+    ('display_attendance', 'calendar', 'Rekap Presensi', ['display_attendance']),
+    ('register_user', 'user-plus', 'Daftar Pengguna', ['register_user']),
+] %}
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Sistem Presensi Pengenalan Wajah{% endblock %}</title>
+    <title>{% block title %}Dashboard{% endblock %} · Presensi Wajah</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div class="container {% block container_class %}{% endblock %}">
-        {% block heading %}{% endblock %}
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <ul class="flashes">
-                {% for category, message in messages %}
-                    <li class="flash-message {{ category }}">{{ message }}</li>
-                {% endfor %}
-                </ul>
-            {% endif %}
-        {% endwith %}
-        {% block content %}{% endblock %}
+<div class="app">
+    <aside class="sidebar">
+        <a class="brand" href="{{ url_for('index') }}">
+            <span class="brand-mark">{{ icon('scan-face') }}</span>
+            <span>
+                <span class="brand-name">Presensi Wajah</span><br>
+                <span class="brand-sub">K-Nearest Neighbor</span>
+            </span>
+        </a>
+
+        <div class="nav-label">Menu</div>
+        <nav class="nav">
+            {% for endpoint, icon_name, label, active_for in nav_items %}
+            <a href="{{ url_for(endpoint) }}" class="{{ 'active' if request.endpoint in active_for }}"
+               {% if request.endpoint in active_for %}aria-current="page"{% endif %} title="{{ label }}">
+                {{ icon(icon_name) }}<span>{{ label }}</span>
+            </a>
+            {% endfor %}
+        </nav>
+
+        <div class="sidebar-note">
+            <strong>{{ icon('terminal') }} Mode presensi</strong>
+            Jalankan <code>python attendance.py</code> di komputer yang terhubung ke kamera.
+        </div>
+    </aside>
+
+    <div class="main">
+        <header class="topbar">
+            <div class="topbar-left">{{ icon('calendar') }} {{ today_label }}</div>
+            <div class="topbar-right">
+                <span class="pill" title="Jam kerja">{{ icon('clock') }} Jam kerja {{ jam_kerja }}</span>
+                {% block topbar_actions %}{% endblock %}
+            </div>
+        </header>
+
+        <main class="content">
+            <div class="page-header">
+                <div>
+                    <h1>{% block heading %}{% endblock %}</h1>
+                    {% block subheading %}{% endblock %}
+                </div>
+                <div class="page-actions">{% block actions %}{% endblock %}</div>
+            </div>
+            {{ flashes() }}
+            {% block content %}{% endblock %}
+        </main>
     </div>
-    {% block scripts %}{% endblock %}
+</div>
+{% block scripts %}{% endblock %}
 </body>
 </html>

@@ -1,54 +1,68 @@
 {% extends "base.html" %}
+{% from "_macros.html" import icon, avatar, status_badge with context %}
 {% block title %}Rekap Presensi{% endblock %}
-{% block container_class %}wide{% endblock %}
-{% block heading %}<h1>Rekap Data Presensi</h1>{% endblock %}
-{% block content %}
-    <form class="filter-section" method="GET" action="{{ url_for('display_attendance') }}">
-        <label for="filter_date">Pilih Tanggal:</label>
-        <input type="date" id="filter_date" name="tanggal" value="{{ selected_date }}">
-        <a class="btn btn-success" href="{{ url_for('export_attendance_excel', tanggal=selected_date) }}">Ekspor ke Excel</a>
+{% block heading %}Rekap Presensi{% endblock %}
+{% block subheading %}<p>Catatan absen masuk dan pulang semua pengguna per tanggal.</p>{% endblock %}
+{% block actions %}
+    <form method="GET" action="{{ url_for('display_attendance') }}">
+        <input class="input" type="date" id="filter_date" name="tanggal" value="{{ selected_date }}" aria-label="Pilih tanggal">
     </form>
+    <a class="btn btn-primary" href="{{ url_for('export_attendance_excel', tanggal=selected_date) }}">{{ icon('download') }} Ekspor Excel</a>
+{% endblock %}
+
+{% block content %}
+<section class="card">
+    <div class="card-header">
+        <div>
+            <h2 class="card-title"><span class="dot"></span>{{ selected_date | date_str_id }}</h2>
+            <p class="card-subtitle">{{ attendance_data | length }} catatan presensi</p>
+        </div>
+        <div class="legend">
+            <span><i class="present"></i>Tepat Waktu</span>
+            <span><i class="late"></i>Terlambat</span>
+            <span><i class="early"></i>Pulang Awal</span>
+        </div>
+    </div>
 
     {% if attendance_data %}
+    <div class="table-wrap">
         <table>
             <thead>
                 <tr>
-                    <th>ID Absen</th>
                     <th>Nama</th>
-                    <th>Tanggal</th>
                     <th>Waktu Masuk</th>
                     <th>Status Masuk</th>
                     <th>Waktu Pulang</th>
                     <th>Status Pulang</th>
+                    <th class="text-right">Status</th>
                 </tr>
             </thead>
             <tbody>
                 {% for record in attendance_data %}
                 <tr>
-                    <td>{{ record.absen_id }}</td>
-                    <td>{{ record.nama }}</td>
-                    <td>{{ record.tanggal }}</td>
-                    <td>{{ record.waktu_masuk or '-' }}</td>
+                    <td>
+                        <a class="person" href="{{ url_for('user_detail', user_id=record.user_id) }}">
+                            {{ avatar(record.nama, 'xs') }}<span class="person-name">{{ record.nama }}</span>
+                        </a>
+                    </td>
+                    <td>{{ record.waktu_masuk | short_time }}</td>
                     <td>{{ record.status_masuk or '-' }}</td>
-                    <td>{{ record.waktu_pulang or '-' }}</td>
+                    <td>{{ record.waktu_pulang | short_time }}</td>
                     <td>{{ record.status_pulang or '-' }}</td>
+                    <td class="text-right">{{ status_badge(record | attendance_status) }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
-    {% else %}
-        <p class="no-data">Belum ada data presensi untuk tanggal ini.</p>
-    {% endif %}
-
-    <div class="actions">
-        <a href="{{ url_for('index') }}" class="btn btn-secondary">Kembali ke Beranda</a>
     </div>
+    {% else %}
+    <div class="empty">{{ icon('calendar') }}<p>Belum ada data presensi untuk tanggal ini.</p></div>
+    {% endif %}
+</section>
 {% endblock %}
+
 {% block scripts %}
 <script>
-    // Muat ulang data begitu tanggal dipilih
-    document.getElementById('filter_date').addEventListener('change', function () {
-        this.form.submit();
-    });
+    document.getElementById('filter_date').addEventListener('change', function () { this.form.submit(); });
 </script>
 {% endblock %}

@@ -80,10 +80,15 @@ class PhpClient:
 
     # --- Presensi ---------------------------------------------------------
 
-    def get_attendance(self, tanggal: str | None = None, user_id: int | None = None) -> list[dict]:
+    def get_attendance(
+        self, tanggal: str | None = None, user_id: int | None = None, bulan: str | None = None
+    ) -> list[dict]:
+        """Ambil catatan presensi per tanggal (YYYY-MM-DD) atau per bulan (YYYY-MM)."""
         params: dict[str, Any] = {}
         if tanggal:
             params["tanggal"] = tanggal
+        elif bulan:
+            params["bulan"] = bulan
         if user_id is not None:
             params["user_id"] = user_id
         return self._request("GET", "getData.php", params=params) or []

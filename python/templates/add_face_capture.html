@@ -1,57 +1,63 @@
 {% extends "base.html" %}
-{% block title %}Pengambilan Data Wajah{% endblock %}
-{% block container_class %}center{% endblock %}
-{% block heading %}<h1>Penangkapan Wajah</h1>{% endblock %}
-{% block content %}
-    <p>Pengguna: <strong>{{ state.user_name or ('ID ' ~ user_id) }}</strong></p>
-    <div class="status-box" id="capture-status">{{ state.message }}</div>
-    <p id="instruction-text">Pastikan kamera aktif. Jendela baru akan terbuka untuk proses penangkapan (tekan 'q' untuk membatalkan).</p>
-    <div id="final-message-area"></div>
+{% from "_macros.html" import icon with context %}
+{% block title %}Pengambilan Wajah{% endblock %}
+{% block heading %}Pengambilan Data Wajah{% endblock %}
+{% block subheading %}<p>Langkah 2 dari 2: sistem mengambil sampel wajah lewat kamera.</p>{% endblock %}
 
-    <div class="actions">
-        <a href="{{ url_for('index') }}" class="btn btn-secondary">Kembali ke Beranda</a>
-        <a href="{{ url_for('manage_users') }}" class="btn btn-secondary hidden" id="manage-users-button">Kelola Pengguna</a>
+{% block content %}
+<section class="card form-card">
+    <div class="capture">
+        <div class="capture-visual {{ 'running' if state.running }}" id="capture-visual">{{ icon('scan-face') }}</div>
+        <div>
+            <h2 class="card-title" style="justify-content: center">{{ state.user_name or ('Pengguna ID ' ~ user_id) }}</h2>
+            <p class="card-subtitle" id="instruction-text">
+                Jendela kamera akan terbuka. Hadapkan wajah ke kamera dan gerakkan sedikit kepala. Tekan <code>q</code> untuk membatalkan.
+            </p>
+        </div>
+        <div class="capture-status" id="capture-status" role="status" aria-live="polite">{{ state.message or 'Menunggu status…' }}</div>
+        <div class="btn-group">
+            <a href="{{ url_for('user_detail', user_id=user_id) }}" class="btn btn-primary hidden" id="detail-button">{{ icon('eye') }} Lihat Pengguna</a>
+            <a href="{{ url_for('manage_users') }}" class="btn btn-outline">{{ icon('users') }} Daftar Pengguna</a>
+        </div>
     </div>
+</section>
 {% endblock %}
+
 {% block scripts %}
 <script>
     (function () {
-        const statusBox = document.getElementById('capture-status');
-        const finalMessageArea = document.getElementById('final-message-area');
-        const instructionText = document.getElementById('instruction-text');
-        const manageUsersButton = document.getElementById('manage-users-button');
+        var statusBox = document.getElementById('capture-status');
+        var visual = document.getElementById('capture-visual');
+        var instruction = document.getElementById('instruction-text');
+        var detailButton = document.getElementById('detail-button');
 
-        function showFinal(text, kind) {
-            const div = document.createElement('div');
-            div.className = 'final-message ' + kind;
-            div.textContent = text;
-            finalMessageArea.replaceChildren(div);
-            instructionText.classList.add('hidden');
-            manageUsersButton.classList.remove('hidden');
+        function finish(outcome, text) {
+            visual.classList.remove('running');
+            visual.classList.add(outcome);
+            statusBox.textContent = text;
+            instruction.classList.add('hidden');
+            detailButton.classList.remove('hidden');
         }
 
-        function checkCaptureStatus() {
+        function poll() {
             fetch('{{ url_for("status_add_face") }}')
                 .then(function (response) { return response.json(); })
                 .then(function (data) {
-                    statusBox.textContent = data.status;
                     if (data.is_running) {
-                        setTimeout(checkCaptureStatus, 2000);
+                        statusBox.textContent = data.status;
+                        setTimeout(poll, 2000);
                     } else if (data.outcome === 'success') {
-                        showFinal('Data wajah berhasil disimpan!', 'success');
+                        finish('success', 'Data wajah berhasil disimpan. ' + data.status);
                     } else if (data.outcome === 'failure') {
-                        showFinal('Pendaftaran wajah gagal. Gunakan "Ambil Ulang Wajah" di halaman Kelola Pengguna.', 'error');
+                        finish('failure', 'Pengambilan wajah gagal: ' + data.status + ' Coba lagi lewat tombol "Ambil Ulang Wajah".');
                     } else {
-                        showFinal('Tidak ada proses penangkapan wajah yang berjalan.', 'error');
+                        finish('failure', 'Tidak ada proses pengambilan wajah yang berjalan.');
                     }
                 })
-                .catch(function () {
-                    statusBox.textContent = 'Gagal mengambil status penangkapan.';
-                    showFinal('Terjadi kesalahan saat berkomunikasi dengan server.', 'error');
-                });
+                .catch(function () { finish('failure', 'Gagal menghubungi server.'); });
         }
 
-        setTimeout(checkCaptureStatus, 1000);
+        setTimeout(poll, 1000);
     })();
 </script>
 {% endblock %}

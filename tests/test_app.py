@@ -36,8 +36,9 @@ class FakeClient:
     def delete_user(self, user_id):
         self.deleted.append(user_id)
 
-    def get_attendance(self, tanggal=None, user_id=None):
-        return [{"absen_id": 1, "nama": "Siti Aminah", "tanggal": tanggal, "waktu_masuk": "07:55:00",
+    def get_attendance(self, tanggal=None, user_id=None, bulan=None):
+        tanggal = tanggal or f"{bulan}-06"
+        return [{"absen_id": 1, "user_id": 1, "nama": "Siti Aminah", "tanggal": tanggal, "waktu_masuk": "07:55:00",
                  "status_masuk": "TEPAT WAKTU", "waktu_pulang": None, "status_pulang": None}]
 
 
@@ -57,8 +58,29 @@ def client(monkeypatch):
 
 
 def test_pages_render(client):
-    for url in ["/", "/register_user", "/manage_users", "/edit_user/1", "/display_attendance?tanggal=2025-01-06"]:
+    for url in [
+        "/",
+        "/register_user",
+        "/manage_users",
+        "/edit_user/1",
+        "/users/1",
+        "/users/1?bulan=2025-01",
+        "/users/1?bulan=bukan-bulan",
+        "/users/1/capture",
+        "/display_attendance?tanggal=2025-01-06",
+    ]:
         assert client.get(url).status_code == 200, url
+
+
+def test_user_detail_shows_month_and_timeline(client):
+    html = client.get("/users/1?bulan=2025-01").get_data(as_text=True)
+    assert "Januari 2025" in html
+    assert "07:55" in html
+    assert "bulan=2024-12" in html and "bulan=2025-02" in html
+
+
+def test_unknown_user_detail_redirects(client):
+    assert client.get("/users/99").status_code == 302
 
 
 def test_register_validation_error(client):

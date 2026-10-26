@@ -1,12 +1,23 @@
 {% extends "base.html" %}
+{% from "_macros.html" import icon with context %}
 {% block title %}Edit Pengguna{% endblock %}
-{% block heading %}<h1>Edit Pengguna</h1>{% endblock %}
+{% block heading %}Edit Pengguna{% endblock %}
+{% block subheading %}<p>Perbarui data diri pengguna. Data wajah tidak berubah.</p>{% endblock %}
+{% block actions %}
+    <a class="btn btn-outline" href="{{ url_for('user_detail', user_id=user_id) }}">{{ icon('arrow-left') }} Kembali</a>
+{% endblock %}
+
 {% block content %}
-    <form class="user-form" method="POST" action="{{ url_for('edit_user', user_id=user_id) }}">
-        {% include "_user_form_fields.html" %}
-        <input type="submit" class="btn btn-success" value="Update Pengguna">
-    </form>
-    <div class="actions">
-        <a href="{{ url_for('manage_users') }}" class="btn btn-secondary">Kembali ke Manajemen Pengguna</a>
+<section class="card form-card">
+    <div class="card-header">
+        <h2 class="card-title"><span class="dot"></span>Data Diri</h2>
     </div>
+    <form method="POST" action="{{ url_for('edit_user', user_id=user_id) }}">
+        {% include "_user_form_fields.html" %}
+        <div class="form-actions">
+            <a href="{{ url_for('user_detail', user_id=user_id) }}" class="btn btn-outline">Batal</a>
+            <button type="submit" class="btn btn-primary">{{ icon('check') }} Simpan Perubahan</button>
+        </div>
+    </form>
+</section>
 {% endblock %}
